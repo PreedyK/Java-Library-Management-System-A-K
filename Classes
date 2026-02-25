@@ -1,0 +1,121 @@
+package library_system;
+
+import java.util.Scanner;
+import java.io.Serializable;
+import java.util.ArrayList;
+
+class Book implements Serializable {
+	private String bookID;
+	private String title;
+	private String author;
+	private String publisher;
+	private String year_of_publishing;
+	private String availability; //Available / Unavailable
+	private String activation; //Current / Previous
+	private String description;
+	private ArrayList<String> authorinfo;
+	
+	//---------------Constructor---------------
+	
+	public Book() { 		
+		this.bookID = "";
+		this.title = "";
+		this.author = "";
+		this.publisher = "";
+		this.year_of_publishing = "";
+		this.availability = "Available";
+		this.activation = "Current";
+		this.description = "";
+		this.authorinfo = new ArrayList<>();
+	}
+	
+	//-----------------Display----------------------
+	
+	public String displayStr() { 
+		return title + " - " + author + " (ID:" + bookID + ")";
+	}
+	
+	//------------------Availability helpers---------
+	
+	public boolean isAvailable() { 
+		return availability.equals("Available");
+	}
+	
+	public void markBorrowed() { 
+		availability = "Unavailable";
+	}
+
+	public void markReturned() { 
+		availability = "Available";
+	}
+	
+	public boolean isCurrent() { 
+		return activation.equals("Current");
+	}
+
+	//------------- Getters & Setters ---------------
+	public String getBookID() { return bookID; }
+	public void setBookID(String bookID) { this.bookID = bookID; }
+	
+	public String getTitle() { return title; }
+	public void setTitle() { this.title = title; }
+	
+	public String getAuthor() { return author; }
+	public void setAuthor(String author) { this.author = author; }
+	
+	public String getPublisher() { return publisher; }
+	public void setPublisher(String publisher) { this.publisher = publisher; }
+	
+	public String getYearOfPublishing() { return year_of_publishing; }
+	public void setYearOfPublishing(String year_of_publishing) { this.year_of_publishing = year_of_publishing; }
+	
+	public String getAvailability() { return availability; }
+	public void setAvailability(String availability) { this.availability = availability; }
+	
+	public String getActivation() { return activation; }
+	public void setActivation(String activation) { this.activation = activation; }
+	
+	public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+
+    public ArrayList<String> getAuthorInfo() { return authorinfo; }
+    public void addAuthorInfo(String info) { authorinfo.add(info); }
+	
+
+}
+
+class Member {
+	int member_id;
+	String member_name;
+	String lib_card_num;
+	String password;
+	boolean ative_status = true;
+	
+	Member(int member_id, String member_name, String lib_card_num, String password) {
+		this.member_id = member_id;
+		this.member_name = member_name;
+		this.lib_card_num = lib_card_num;
+		this.password = password;
+	}
+}
+
+class Author {
+	int author_id;
+	String author_name;
+	String country;
+	String [] books_written;
+	
+	Author(int author_id, String author_name, String country) {
+		this.author_id = author_id;
+		this.author_name = author_name;
+		this.country = country;
+	}
+}
+
+public class LibraryManagementSystem {
+
+	public static void main(String[] args) {
+
+	}
+
+}
