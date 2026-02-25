@@ -48,6 +48,20 @@ class Author {
 		this.country = country;
 	}
 }
+class Admin {
+	int admin_id;
+	String admin_name;
+	String position;
+	String password;
+	String email;
+	
+	Admin(int admin_id, String admin_name, String position, String password, String email){
+		this.admin_id = admin_id;
+		this.position = position;
+		this.password = password;
+		this.email = email;
+	}
+}
 public class LibraryManagementSystem {
 
 	public static void main(String[] args) {
