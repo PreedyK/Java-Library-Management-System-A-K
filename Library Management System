@@ -64,6 +64,21 @@ class Admin {
 		this.email = email;
 	}
 }
+class Library {
+	ArrayList<Book> boks = new ArrayList<>();
+	ArrayList<Member> members = new ArrayList<>();
+	ArrayList<Admin> admins = new ArrayList<>();
+	
+	Library(){
+		admins.add(new Admin(1, "Admin", "Librarian", "admin123", "admin@library.com"));
+	}
+	
+	Admin authenticateAdmin(String email, String password) {
+		for (Admin a:admins) {
+			if (a.email.equals(email)
+		}
+	}
+}
 public class LibraryManagementSystem {
 
 	public static void main(String[] args) {
