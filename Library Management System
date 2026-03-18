@@ -27,13 +27,15 @@ class Member {
 	int member_id;
 	String member_name;
 	String lib_card_num;
+	String email;
 	String password;
 	boolean ative_status = true;
 	
-	Member(int member_id, String member_name, String lib_card_num, String password) {
+	Member(int member_id, String member_name, String lib_card_num, String email, String password) {
 		this.member_id = member_id;
 		this.member_name = member_name;
 		this.lib_card_num = lib_card_num;
+		this.email = email;
 		this.password = password;
 	}
 }
@@ -65,7 +67,7 @@ class Admin {
 	}
 }
 class Library {
-	ArrayList<Book> boks = new ArrayList<>();
+	ArrayList<Book> books = new ArrayList<>();
 	ArrayList<Member> members = new ArrayList<>();
 	ArrayList<Admin> admins = new ArrayList<>();
 	
@@ -73,12 +75,27 @@ class Library {
 		admins.add(new Admin(1, "Admin", "Librarian", "admin123", "admin@library.com"));
 	}
 	
-	Admin authenticateAdmin(String email, String password) {
+	Admin authenticateAdmin(String current_email, String current_password) {
 		for (Admin a:admins) {
-			if (a.email.equals(email)
+			if (a.email.equals(current_email)) {
+				if (a.password.equals(current_password)) {
+					return a;
+				}
+			}
 		}
+		return null;
+	}
+	
+	Member memberLogin(String email, String password) {
+		for (Member m: members) {
+			if (m.email.equals(email) && m.password.equals(password)) {
+				return m;
+			}
+		}
+		return null;
 	}
 }
+
 public class LibraryManagementSystem {
 
 	public static void main(String[] args) {
