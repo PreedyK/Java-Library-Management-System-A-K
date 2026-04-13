@@ -250,12 +250,14 @@ class LibraryGUI extends JFrame {
 
     private CardLayout cardLayout;
     private JPanel mainPanel;
+    
+    private DefaultTableModel bookTableModel;
 
     public LibraryGUI(Library library) {
         this.library = library;
 
         setTitle("Library System");
-        setSize(500, 400);
+        setSize(700, 500);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         cardLayout = new CardLayout();
@@ -272,36 +274,38 @@ class LibraryGUI extends JFrame {
     // ---------------- LOGIN PANEL ----------------
     private JPanel loginPanel() {
         JPanel panel = new JPanel(new GridLayout(4, 2));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
 
-        JTextField email = new JTextField();
-        JPasswordField password = new JPasswordField();
+        JTextField email = new JTextField(15);
+        JPasswordField password = new JPasswordField(15);
 
         JButton loginBtn = new JButton("Login");
-
-        panel.add(new JLabel("Email:"));
-        panel.add(email);
-        panel.add(new JLabel("Password:"));
-        panel.add(password);
-        panel.add(new JLabel());
-        panel.add(loginBtn);
+        
+        gbc.gridx = 0; gbc.gridy = 1;
+        panel.add(new JLabel("Email:"), gbc);
+        
+        gbc.gridx = 1;
+        panel.add(email, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 1;
+        panel.add(new JLabel("Password:"), gbc);
+        
+        gbc.gridx = 1;
+        panel.add(password, gbc);
+        
+        gbc.gridx = 1; gbc.gridy = 2;
+        panel.add(loginBtn, gbc);
 
         loginBtn.addActionListener(e -> {
-            String em = email.getText();
-            String pw = new String(password.getPassword());
-
-            currentAdmin = library.authenticateAdmin(em, pw);
-            if (currentAdmin != null) {
-                cardLayout.show(mainPanel, "admin");
-                return;
+        	Member m = library.memberLogin(email.getText(), new String(password.getPassword()));
+            if (m != null) {
+                currentMember = m;
+                refreshTable();
+                CardLayout.show(mainPanel, "member");
+            } else {
+                JOptionPane.showMessageDialog(this, "Invalid login");
             }
-
-            currentMember = library.memberLogin(em, pw);
-            if (currentMember != null) {
-                cardLayout.show(mainPanel, "member");
-                return;
-            }
-
-            JOptionPane.showMessageDialog(this, "Invalid login");
         });
 
         return panel;
