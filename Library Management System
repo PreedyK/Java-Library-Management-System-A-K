@@ -1,6 +1,8 @@
 package comHamann;
 import java.util.Scanner;
 import java.util.ArrayList;
+import javax.swing.*;
+import java.awt.*;
 
 //BOOK CLASS
 class Book {
@@ -203,7 +205,7 @@ class Library {
             }
         }
         return false;
- }
+    }
     //display books borrowed by member who is logged in
     void displayBorrowedBooks(Member member) {
         System.out.println(member.member_name + "'s borrowed books:");
@@ -237,198 +239,198 @@ class Library {
         System.out.println("Author not found.");
     }
 
+    
+}
+
+class LibraryGUI extends JFrame {
+
+    private Library library;
+    private Member currentMember;
+    private Admin currentAdmin;
+
+    private CardLayout cardLayout;
+    private JPanel mainPanel;
+
+    public LibraryGUI(Library library) {
+        this.library = library;
+
+        setTitle("Library System");
+        setSize(500, 400);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        cardLayout = new CardLayout();
+        mainPanel = new JPanel(cardLayout);
+
+        mainPanel.add(loginPanel(), "login");
+        mainPanel.add(adminPanel(), "admin");
+        mainPanel.add(memberPanel(), "member");
+
+        add(mainPanel);
+        setVisible(true);
+    }
+
+    // ---------------- LOGIN PANEL ----------------
+    private JPanel loginPanel() {
+        JPanel panel = new JPanel(new GridLayout(4, 2));
+
+        JTextField email = new JTextField();
+        JPasswordField password = new JPasswordField();
+
+        JButton loginBtn = new JButton("Login");
+
+        panel.add(new JLabel("Email:"));
+        panel.add(email);
+        panel.add(new JLabel("Password:"));
+        panel.add(password);
+        panel.add(new JLabel());
+        panel.add(loginBtn);
+
+        loginBtn.addActionListener(e -> {
+            String em = email.getText();
+            String pw = new String(password.getPassword());
+
+            currentAdmin = library.authenticateAdmin(em, pw);
+            if (currentAdmin != null) {
+                cardLayout.show(mainPanel, "admin");
+                return;
+            }
+
+            currentMember = library.memberLogin(em, pw);
+            if (currentMember != null) {
+                cardLayout.show(mainPanel, "member");
+                return;
+            }
+
+            JOptionPane.showMessageDialog(this, "Invalid login");
+        });
+
+        return panel;
+    }
+
+    // ---------------- ADMIN PANEL ----------------
+    private JPanel adminPanel() {
+        JPanel panel = new JPanel(new GridLayout(5, 1));
+
+        JButton addBook = new JButton("Add Book");
+        JButton viewBooks = new JButton("View Books");
+        JButton addMember = new JButton("Add Member");
+        JButton viewMembers = new JButton("View Members");
+        JButton logout = new JButton("Logout");
+
+        panel.add(addBook);
+        panel.add(viewBooks);
+        panel.add(addMember);
+        panel.add(viewMembers);
+        panel.add(logout);
+
+        addBook.addActionListener(e -> {
+            String title = JOptionPane.showInputDialog("Title:");
+            String author = JOptionPane.showInputDialog("Author:");
+            String country = JOptionPane.showInputDialog("Author Country:");
+            String publisher = JOptionPane.showInputDialog("Publisher:");
+            int year = Integer.parseInt(JOptionPane.showInputDialog("Year:"));
+            String genre = JOptionPane.showInputDialog("Genre:");
+
+            library.createBook(title, author, country, publisher, year, genre);
+        });
+
+        viewBooks.addActionListener(e -> {
+            StringBuilder sb = new StringBuilder();
+            for (Book b : library.books) {
+                sb.append(b.book_id + ": " + b.title + "\n");
+            }
+            JOptionPane.showMessageDialog(this, sb.toString());
+        });
+
+        addMember.addActionListener(e -> {
+            String name = JOptionPane.showInputDialog("Name:");
+            String card = JOptionPane.showInputDialog("Card #:");
+            String email = JOptionPane.showInputDialog("Email:");
+            String pass = JOptionPane.showInputDialog("Password:");
+
+            library.createMember(name, card, email, pass);
+        });
+
+        viewMembers.addActionListener(e -> {
+            StringBuilder sb = new StringBuilder();
+            for (Member m : library.members) {
+                sb.append(m.member_name + "\n");
+            }
+            JOptionPane.showMessageDialog(this, sb.toString());
+        });
+
+        logout.addActionListener(e -> cardLayout.show(mainPanel, "login"));
+
+        return panel;
+    }
+
+    // ---------------- MEMBER PANEL ----------------
+    private JPanel memberPanel() {
+        JPanel panel = new JPanel(new GridLayout(5, 1));
+
+        JButton viewBooks = new JButton("View Books");
+        JButton borrow = new JButton("Borrow Book");
+        JButton returnBook = new JButton("Return Book");
+        JButton myBooks = new JButton("My Books");
+        JButton logout = new JButton("Logout");
+
+        panel.add(viewBooks);
+        panel.add(borrow);
+        panel.add(returnBook);
+        panel.add(myBooks);
+        panel.add(logout);
+
+        viewBooks.addActionListener(e -> {
+            StringBuilder sb = new StringBuilder();
+            for (Book b : library.books) {
+                sb.append(b.book_id + ": " + b.title + "\n");
+            }
+            JOptionPane.showMessageDialog(this, sb.toString());
+        });
+
+        borrow.addActionListener(e -> {
+            int id = Integer.parseInt(JOptionPane.showInputDialog("Book ID:"));
+            if (library.borrowBook(id, currentMember)) {
+                JOptionPane.showMessageDialog(this, "Borrowed!");
+            } else {
+                JOptionPane.showMessageDialog(this, "Not available.");
+            }
+        });
+
+        returnBook.addActionListener(e -> {
+            int id = Integer.parseInt(JOptionPane.showInputDialog("Book ID:"));
+            if (library.returnBook(id, currentMember)) {
+                JOptionPane.showMessageDialog(this, "Returned!");
+            } else {
+                JOptionPane.showMessageDialog(this, "Error.");
+            }
+        });
+
+        myBooks.addActionListener(e -> {
+            StringBuilder sb = new StringBuilder();
+            for (Book b : library.books) {
+                if (b.borrowedBy == currentMember) {
+                    sb.append(b.title + "\n");
+                }
+            }
+            JOptionPane.showMessageDialog(this, sb.toString());
+        });
+
+        logout.addActionListener(e -> cardLayout.show(mainPanel, "login"));
+
+        return panel;
+    }
 }
 
 //MAIN CLASS
 public class LibManSystem {
 	public static void main(String[] args) {
-		Scanner scanner = new Scanner(System.in);
-        Library library = new Library();
+		Library library = new Library();
 
-        // Add some initial books, members, and admin for testing
-        library.createBook("1984", "George Orwell", "UK", "Secker", 1949, "Dystopian");
-        library.createBook("Animal Farm", "George Orwell", "UK", "Secker", 1945, "Political allegory");
-        library.createMember("Abby", "12345", "abby@email.com", "pass");
-        library.createAdmin("Admin", "Librarian", "admin123", "admin@library.com");
+		library.createBook("1984", "George Orwell", "UK", "Secker", 1949, "Dystopian");
+		library.createMember("Abby", "12345", "abby@email.com", "pass");
+		library.createAdmin("Admin", "Librarian", "admin123", "admin@library.com");
 
-        System.out.println("=== Welcome to the Library Management System ===");
-
-        while (true) {
-            System.out.println("\n1. Login");
-            System.out.println("2. Exit");
-            System.out.print("Choice: ");
-            int mainChoice = scanner.nextInt();
-            scanner.nextLine(); // clear buffer
-
-            if (mainChoice == 1) {
-                System.out.print("Enter email: ");
-                String email = scanner.nextLine();
-                System.out.print("Enter password: ");
-                String password = scanner.nextLine();
-
-                // Try admin login first
-                Admin admin = library.authenticateAdmin(email, password);
-                if (admin != null) {
-                    runAdminMenu(scanner, library, admin);
-                } else {
-                    // Try member login
-                    Member member = library.memberLogin(email, password);
-                    if (member != null) {
-                        runMemberMenu(scanner, library, member);
-                    } else {
-                        System.out.println("Invalid login. Try again.");
-                    }
-                }
-            } else {
-                System.out.println("Goodbye!");
-                break;
-            }
-        }
-
-        scanner.close();
-    }
-
-    // Admin menu
-    static void runAdminMenu(Scanner scanner, Library library, Admin admin) {
-        System.out.println("Welcome Admin " + admin.admin_name);
-        while (true) {
-            System.out.println("\n--- Admin Menu ---");
-            System.out.println("1. Add Book");
-            System.out.println("2. View Books");
-            System.out.println("3. Add Member");
-            System.out.println("4. View Members");
-            System.out.println("5. View Authors");
-            System.out.println("6. View Books by Author");
-            System.out.println("7. Deactivate Member");
-            System.out.println("8. Exit");
-            System.out.print("Choice: ");
-            int choice = scanner.nextInt();
-            scanner.nextLine(); // clear buffer
-
-            if (choice == 1) {
-                System.out.print("Title: ");
-                String title = scanner.nextLine();
-                System.out.print("Author Name: ");
-                String authorName = scanner.nextLine();
-                System.out.print("Author Country: ");
-                String authorCountry = scanner.nextLine();
-                System.out.print("Publisher: ");
-                String publisher = scanner.nextLine();
-                System.out.print("Year: ");
-                int year = scanner.nextInt();
-                scanner.nextLine(); // clear buffer
-                System.out.print("Genre: ");
-                String description = scanner.nextLine();
-
-                library.createBook(title, authorName, authorCountry, publisher, year, description);
-                System.out.println("Book added successfully!");
-
-            } else if (choice == 2) {
-                library.displayBooks();
-
-            } else if (choice == 3) {
-                System.out.print("Name: ");
-                String name = scanner.nextLine();
-                System.out.print("Library Card Number: ");
-                String cardNum = scanner.nextLine();
-                System.out.print("Email: ");
-                String memEmail = scanner.nextLine();
-                System.out.print("Password: ");
-                String memPassword = scanner.nextLine();
-
-                library.createMember(name, cardNum, memEmail, memPassword);
-                System.out.println("Member added successfully!");
-
-            } else if (choice == 4) {
-            	library.displayMembers();
-            	
-            } else if (choice == 5) {
-            	library.displayAuthors();
-            	
-            } else if (choice == 6) {
-                library.displayAuthors();
-                System.out.print("Enter author ID: ");
-                int id = scanner.nextInt();
-                scanner.nextLine();
-
-                library.displayBooksByAuthor(id);
-                
-            } else if (choice == 7) {
-            	System.out.print("Enter member name");
-            	String memName = scanner.nextLine();
-            	library.deactivateMember(memName);
-            	
-            } else if (choice == 8) {
-                System.out.println("Exiting admin menu.");
-                break;
-                
-            } else {
-                System.out.println("Invalid choice. Try again.");
-            }
-        }
-    }
-
-    // Member menu
-    static void runMemberMenu(Scanner scanner, Library library, Member member) {
-        System.out.println("Welcome " + member.member_name);
-        while (true) {
-            System.out.println("\n--- Member Menu ---");
-            System.out.println("1. View Books");
-            System.out.println("2. Borrow Book");
-            System.out.println("3. Return Book");
-            System.out.println("4. My Borrowed Books");
-            System.out.println("5. View Authors");
-            System.out.println("6. View Books by Author");
-            System.out.println("7. Exit");
-            System.out.print("Choice: ");
-            int choice = scanner.nextInt();
-            scanner.nextLine(); // clear buffer
-
-            if (choice == 1) {
-                library.displayBooks();
-
-            } else if (choice == 2) {
-                System.out.print("Enter book ID to borrow: ");
-                int id = scanner.nextInt();
-                scanner.nextLine();
-
-                if (library.borrowBook(id, member)) {
-                    System.out.println("Book borrowed!");
-                } else {
-                    System.out.println("Book not available.");
-                }
-
-            } else if (choice == 3) {
-                System.out.print("Enter book ID to return: ");
-                int id = scanner.nextInt();
-                scanner.nextLine();
-
-                if (library.returnBook(id, member)) {
-                    System.out.println("Book returned!");
-                } else {
-                    System.out.println("You can't return this book.");
-                }
-
-            } else if (choice == 4) {
-                library.displayBorrowedBooks(member);
-
-            } else if (choice == 5) {
-            	library.displayAuthors();
-            	
-            }else if (choice == 6) {
-                library.displayAuthors();
-                System.out.print("Enter author ID: ");
-                int id = scanner.nextInt();
-                scanner.nextLine();
-
-                library.displayBooksByAuthor(id);
-            } else if (choice == 7) {
-                System.out.println("Exiting member menu.");
-                break;
-
-            } else {
-                System.out.println("Invalid choice. Try again.");
-            }
-        }
+		new LibraryGUI(library);
 	}
 }
