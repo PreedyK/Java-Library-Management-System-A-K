@@ -1,5 +1,5 @@
 package comHamann;
-import java.util.Scanner;
+
 import java.util.ArrayList;
 import javax.swing.*;
 import java.awt.*;
@@ -107,7 +107,7 @@ class Library {
 	//member login
 	Member memberLogin(String email, String password) {
 		for (Member m: members) {
-			if (m.email.equals(email) && m.password.equals(password)) {
+			if (m.email.equals(email) && m.password.equals(password)&& m.active_status) {
 				return m;
 			}
 		}
@@ -123,22 +123,32 @@ class Library {
     }
     
     //deactivate member
-    Member deactivateMember(String name) {
-    	for (Member m : members) {
-            if (m.member_name.equalsIgnoreCase(name)) {
-            	if (m.active_status) {
-            		m.active_status = false;
-            		return m;
-            	}
-            	else {
-            		System.out.println("Error: This member is already inactive");
-            		return null;
-            	}
+    Member deactivateMember(int memberId) {
+        for (Member m : members) {
+            if (m.member_id == memberId) {
+                if (m.active_status) {
+                    m.active_status = false;
+                    return m;
+                } else {
+                    return null; // already inactive
+                }
             }
         }
-    	System.out.println("Error: Member not found");
+        return null; // not found
+    }
+    
+    Member activateMember(int memberId) {
+        for (Member m : members) {
+            if (m.member_id == memberId) {
+                if (!m.active_status) {
+                    m.active_status = true;
+                    return m;
+                } else {
+                    return null; // already active
+                }
+            }
+        }
         return null;
-    	
     }
     
     //display members
@@ -186,7 +196,7 @@ class Library {
     boolean borrowBook(int bookId, Member member) {
         if (member.active_status == true) {
     	for (Book b : books) {
-            if (b.book_id == bookId && b.available) {
+            if (b.book_id == bookId && b.available && b.activated) {
                 b.available = false;
                 b.borrowedBy = member;
                 return true;
@@ -239,6 +249,34 @@ class Library {
         }
         System.out.println("Author not found.");
     }
+    
+    Book deactivateBook(int bookId) {
+        for (Book b : books) {
+            if (b.book_id == bookId) {
+                if (b.activated) {
+                    b.activated = false;
+                    return b;
+                } else {
+                    return null; // already inactive
+                }
+            }
+        }
+        return null;
+    }
+    
+    Book activateBook(int bookId) {
+        for (Book b : books) {
+            if (b.book_id == bookId) {
+                if (!b.activated) {
+                    b.activated = true;
+                    return b;
+                } else {
+                    return null; // already active
+                }
+            }
+        }
+        return null;
+    }
 
     
 }
@@ -253,8 +291,18 @@ class LibraryGUI extends JFrame {
     private JPanel mainPanel;
     
     private JTable bookTable;
-    private DefaultTableModel tableModel;
+    private JTable memberTable;
+    private JTable myBooksTable;
 
+    private DefaultTableModel bookTableModel;
+    private DefaultTableModel memberTableModel;
+    private DefaultTableModel myBooksTableModel;
+    
+    private int selectedMemberId = -1;
+    private int selectedBookId = -1;
+    
+    
+    //constructor
     public LibraryGUI(Library library) {
         this.library = library;
 
@@ -265,27 +313,50 @@ class LibraryGUI extends JFrame {
         cardLayout = new CardLayout();
         mainPanel = new JPanel(cardLayout);
         
-        String[] columns = {"ID", "Title", "Author", "Year", "Status"};
-        tableModel = new DefaultTableModel(columns, 0);
-        bookTable = new JTable(tableModel);
+        // BOOK TABLE
+        String[] bookColumns = {"ID", "Title", "Author", "Year", "Status"};
+        bookTableModel = new DefaultTableModel(bookColumns, 0);
+        bookTable = new JTable(bookTableModel);
+
+        // MEMBER TABLE
+        String[] memberColumns = {"ID", "Name", "Card #", "Email", "Status"};
+        memberTableModel = new DefaultTableModel(memberColumns, 0);
+        memberTable = new JTable(memberTableModel);
+        memberTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        memberTable.setRowSelectionAllowed(true);
+        memberTable.setColumnSelectionAllowed(false);
+        
+     // MYBOOKS TABLE
+        String[] myBooksColumns = {"ID", "Title", "Author", "Year", "Status"};
+        myBooksTableModel = new DefaultTableModel(myBooksColumns, 0);
+        myBooksTable = new JTable(myBooksTableModel);
 
         mainPanel.add(loginPanel(), "login");
         mainPanel.add(adminPanel(), "admin");
         mainPanel.add(memberPanel(), "member");
-        mainPanel.add(tablePanel(), "table");
+        mainPanel.add(bookTablePanel(), "booksTable");
+        mainPanel.add(memberTablePanel(), "membersTable");
+        mainPanel.add(myBooksTablePanel(), "myBooksTable");
 
         add(mainPanel);
         setVisible(true);   
     }
     
     private void showBooksTable() {
-        String[] columns = {"ID", "Title", "Author", "Year", "Status"};
-        tableModel.setDataVector(new Object[0][0], columns);
+        bookTableModel.setRowCount(0);
 
         for (Book b : library.books) {
-            String status = b.available ? "Available" : "Borrowed";
+            String status;
 
-            tableModel.addRow(new Object[]{
+            if (!b.activated) {
+                status = "Inactive";
+            } else if (b.available) {
+                status = "Available";
+            } else {
+                status = "Borrowed";
+            }
+
+            bookTableModel.addRow(new Object[]{
                 b.book_id,
                 b.title,
                 b.author.author_name,
@@ -294,17 +365,16 @@ class LibraryGUI extends JFrame {
             });
         }
 
-        cardLayout.show(mainPanel, "table");
+        cardLayout.show(mainPanel, "booksTable");
     }
     
     private void showMembersTable() {
-        String[] columns = {"ID", "Name", "Card #", "Email", "Status"};
-        tableModel.setDataVector(new Object[0][0], columns);
+        memberTableModel.setRowCount(0);
 
         for (Member m : library.members) {
             String status = m.active_status ? "Active" : "Inactive";
 
-            tableModel.addRow(new Object[]{
+            memberTableModel.addRow(new Object[]{
                 m.member_id,
                 m.member_name,
                 m.lib_card_num,
@@ -313,45 +383,161 @@ class LibraryGUI extends JFrame {
             });
         }
 
-        cardLayout.show(mainPanel, "table");
+        cardLayout.show(mainPanel, "membersTable");
     }
     
     private void showMyBooksTable() {
-        String[] columns = {"ID", "Title", "Author", "Year", "Status"};
-        tableModel.setDataVector(new Object[0][0], columns);
-
+    	myBooksTableModel.setRowCount(0);
         for (Book b : library.books) {
-            if (b.borrowedBy == currentMember) {
-            	tableModel.addRow(new Object[]{
-                        b.book_id,
-                        b.title,
-                        b.author.author_name,
-                        b.year,
-                        "Borrowed"
-                    });
-            }
-
-            
+            if (b.borrowedBy != null && b.borrowedBy.member_id == currentMember.member_id) {
+                myBooksTableModel.addRow(new Object[]{
+                    b.book_id,
+                    b.title,
+                    b.author.author_name,
+                    b.year,
+                    "Borrowed"
+                });
+            }           
         }
-
-        cardLayout.show(mainPanel, "table");
+        cardLayout.show(mainPanel, "myBooksTable");
     }
+    private void enableMemberSelection(JButton actionButton) {
 
+        memberTable.getSelectionModel().addListSelectionListener(e -> {
+            if (e.getValueIsAdjusting()) return;
+
+            int row = memberTable.getSelectedRow();
+            if (row == -1) return;
+
+            selectedMemberId = (int) memberTableModel.getValueAt(row, 0);
+            String status = (String) memberTableModel.getValueAt(row, 4);
+
+        });
+    }
     
-    private JPanel tablePanel() {
+    private void enableBookSelection(JButton actionButton) {
+
+        bookTable.getSelectionModel().addListSelectionListener(e -> {
+            if (e.getValueIsAdjusting()) return;
+
+            int row = bookTable.getSelectedRow();
+            if (row == -1) return;
+
+            selectedBookId = (int) bookTableModel.getValueAt(row, 0);
+            String status = (String) bookTableModel.getValueAt(row, 4);
+         
+        });
+    }
+    
+    private JPanel bookTablePanel() {
         JPanel panel = new JPanel(new BorderLayout());
+
         JScrollPane scrollPane = new JScrollPane(bookTable);
         panel.add(scrollPane, BorderLayout.CENTER);
-        
+
+        JPanel bottom = new JPanel();
+
+        JButton actionBtn = new JButton("Toggle Book Status");
         JButton back = new JButton("Back");
-        back.addActionListener(e -> {
-            if (currentAdmin != null) {
-                cardLayout.show(mainPanel, "admin");
-            } else {
-                cardLayout.show(mainPanel, "member");
+
+        enableBookSelection(actionBtn);
+
+        actionBtn.addActionListener(e -> {
+            if (selectedBookId == -1) {
+                JOptionPane.showMessageDialog(this, "Select a book first.");
+                return;
             }
+
+            // find book so we know its current state
+            Book target = null;
+            for (Book b : library.books) {
+                if (b.book_id == selectedBookId) {
+                    target = b;
+                    break;
+                }
+            }
+
+            if (target == null) return;
+
+            if (target.activated) {
+                library.deactivateBook(selectedBookId);
+                JOptionPane.showMessageDialog(this, "Book deactivated.");
+            } else {
+                library.activateBook(selectedBookId);
+                JOptionPane.showMessageDialog(this, "Book activated.");
+            }
+
+            showBooksTable();
         });
 
+        back.addActionListener(e -> {
+            if (currentAdmin != null) cardLayout.show(mainPanel, "admin");
+            else cardLayout.show(mainPanel, "member");
+        });
+
+        bottom.add(actionBtn);
+        bottom.add(back);
+
+        panel.add(bottom, BorderLayout.SOUTH);
+        return panel;
+    }
+    
+    private JPanel memberTablePanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+
+        JScrollPane scrollPane = new JScrollPane(memberTable);
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        JPanel bottom = new JPanel();
+
+        JButton actionBtn = new JButton("Toggle Member Status");
+        JButton back = new JButton("Back");
+
+        enableMemberSelection(actionBtn);
+
+        actionBtn.addActionListener(e -> {
+            if (selectedMemberId == -1) {
+                JOptionPane.showMessageDialog(this, "Select a member first.");
+                return;
+            }
+
+            // find member so we know current state
+            Member target = null;
+            for (Member m : library.members) {
+                if (m.member_id == selectedMemberId) {
+                    target = m;
+                    break;
+                }
+            }
+
+            if (target == null) return;
+
+            if (target.active_status) {
+                library.deactivateMember(selectedMemberId);
+                JOptionPane.showMessageDialog(this, "Member deactivated.");
+            } else {
+                library.activateMember(selectedMemberId);
+                JOptionPane.showMessageDialog(this, "Member activated.");
+            }
+
+            showMembersTable();
+        });
+
+        back.addActionListener(e -> cardLayout.show(mainPanel, "admin"));
+
+        bottom.add(actionBtn);
+        bottom.add(back);
+
+        panel.add(bottom, BorderLayout.SOUTH);
+        return panel;
+    }
+    
+    private JPanel myBooksTablePanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        JScrollPane scrollPane = new JScrollPane(myBooksTable);
+        panel.add(scrollPane, BorderLayout.CENTER);
+        JButton back = new JButton("Back");
+        back.addActionListener(e -> cardLayout.show(mainPanel, "member"));
         panel.add(back, BorderLayout.SOUTH);
         return panel;
     }
@@ -430,7 +616,7 @@ class LibraryGUI extends JFrame {
 
     // ---------------- ADMIN PANEL ----------------
     private JPanel adminPanel() {
-        JPanel panel = new JPanel(new GridLayout(5, 1));
+        JPanel panel = new JPanel(new GridLayout(7, 1));
 
         JButton addBook = new JButton("Add Book");
         JButton viewBooks = new JButton("View Books");
@@ -467,6 +653,7 @@ class LibraryGUI extends JFrame {
         });
 
         viewMembers.addActionListener(e -> showMembersTable());
+        
 
         logout.addActionListener(e -> cardLayout.show(mainPanel, "login"));
 
