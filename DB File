@@ -1,0 +1,590 @@
+package preedkGUI;
+import java.util.Scanner;
+import java.util.ArrayList;
+import javax.swing.*;
+import java.awt.*;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.*;
+
+class DBConnection {
+    private static final String URL = "jdbc:sqlite:library.db";
+
+    public static Connection connect() {
+        try {
+            return DriverManager.getConnection(URL);
+        } catch (SQLException e) {
+            System.out.println("Connection failed: " + e.getMessage());
+            return null;
+        }
+    }
+}
+class DBSetup { 
+	public static void initialize() { 
+		
+		String books = """
+	            CREATE TABLE IF NOT EXISTS books (
+	                id INTEGER PRIMARY KEY AUTOINCREMENT,
+	                title TEXT,
+	                author TEXT,
+	                publisher TEXT,
+	                year INTEGER,
+	                genre TEXT,
+	                available INTEGER
+	            );
+	        """;
+
+	        String members = """
+	            CREATE TABLE IF NOT EXISTS members (
+	                id INTEGER PRIMARY KEY AUTOINCREMENT,
+	                name TEXT,
+	                card TEXT,
+	                email TEXT,
+	                password TEXT,
+	                active INTEGER
+	            );
+	        """;
+
+	        try (Connection conn = DBConnection.connect();
+	             Statement stmt = conn.createStatement()) {
+
+	            stmt.execute(books);
+	            stmt.execute(members);
+
+	        } catch (SQLException e) {
+	            e.printStackTrace();
+	        }
+		
+	}
+}
+
+
+//BOOK CLASS
+class Book {
+	int book_id;
+	String title;
+	Author author;
+	String publisher;
+	int year;
+	boolean available = true;
+	boolean activated = true;
+	String genre;
+	Member borrowedBy = null;
+	
+	Book(int book_id, String title, Author author, String publisher, int year, String genre) {
+		this.book_id = book_id;
+		this.title = title;
+		this.author = author;
+		this.publisher = publisher;
+		this.year = year;
+		this.genre = genre;
+	}
+		
+}
+
+//MEMBER CLASS
+class Member {
+	int member_id;
+	String member_name;
+	String lib_card_num;
+	String email;
+	String password;
+	boolean active_status = true;
+	
+	Member(int member_id, String member_name, String lib_card_num, String email, String password) {
+		this.member_id = member_id;
+		this.member_name = member_name;
+		this.lib_card_num = lib_card_num;
+		this.email = email;
+		this.password = password;
+	}
+}
+
+//AUTHOR CLASS
+class Author {
+	int author_id;
+	String author_name;
+	String country;
+	ArrayList<Book> books_written = new ArrayList<>();
+	
+	Author(int author_id, String author_name, String country) {
+		this.author_id = author_id;
+		this.author_name = author_name;
+		this.country = country;
+	}
+}
+
+//AUTHOR CLASS
+class Admin {
+	int admin_id;
+	String admin_name;
+	String position;
+	String password;
+	String email;
+	
+	Admin(int admin_id, String admin_name, String position, String password, String email){
+		this.admin_id = admin_id;
+		this.admin_name = admin_name;
+		this.position = position;
+		this.password = password;
+		this.email = email;
+	}
+}
+
+//LIBRARY CLASS
+class Library {
+	ArrayList<Book> books = new ArrayList<>();
+	ArrayList<Member> members = new ArrayList<>();
+	ArrayList<Admin> admins = new ArrayList<>();
+	ArrayList<Author> authors = new ArrayList<>();
+	
+	//create admin
+	int nextAdminid = 1;
+	Admin createAdmin(String name, String position, String password, String email) {
+		Admin a = new Admin(nextAdminid++, name, position, password, email);
+		admins.add(a);
+		return a;
+	}
+	
+	//admin login
+	Admin authenticateAdmin(String current_email, String current_password) {
+		for (Admin a:admins) {
+			if (a.email.equals(current_email)) {
+				if (a.password.equals(current_password)) {
+					return a;
+				}
+			}
+		}
+		return null;
+	}
+	
+	//member login
+	Member memberLogin(String email, String password) {
+		for (Member m: members) {
+			if (m.email.equals(email) && m.password.equals(password)) {
+				return m;
+			}
+		}
+		return null;
+	}
+	
+	//create member
+    int nextMemberId = 1;
+    Member createMember(String name, String cardNum, String email, String password) {
+        Member m = new Member(nextMemberId++, name, cardNum, email, password);
+        members.add(m);
+        
+        String sql = "INSERT INTO members(name, card, email, password, active) VALUES (?, ?, ?, ?, ?)";
+
+        try (Connection conn = DBConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, name);
+            pstmt.setString(2, cardNum);
+            pstmt.setString(3, email);
+            pstmt.setString(4, password);
+            pstmt.setInt(5, 1);
+
+            pstmt.executeUpdate();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return m;
+    }
+    
+    //deactivate member
+    Member deactivateMember(String name) {
+    	for (Member m : members) {
+            if (m.member_name.equalsIgnoreCase(name)) {
+            	if (m.active_status) {
+            		m.active_status = false;
+            		return m;
+            	}
+            	else {
+            		System.out.println("Error: This member is already inactive");
+            		return null;
+            	}
+            }
+        }
+    	System.out.println("Error: Member not found");
+        return null;
+    	
+    }
+    
+    //display members
+    void displayMembers() {
+        for (Member m : members) {
+        	String status = m.active_status ? "Active" : "Inactive";
+            System.out.println(m.member_id + ": " + m.member_name + ". Card number: " + m.lib_card_num + ". Email: " + m.email + ". Password: " + m.password + " [" + status + "]");
+        }
+    }
+	 
+	//create author
+	int nextAuthorId = 1;
+    Author getOrCreateAuthor(String name, String country) {
+        // Look for existing author
+        for (Author a : authors) {
+            if (a.author_name.equalsIgnoreCase(name)) {
+                return a;
+            }
+        }
+        // Not found → create new
+        Author newAuthor = new Author(nextAuthorId++, name, country);
+        authors.add(newAuthor);
+        return newAuthor;
+    }
+    
+    //create book
+	int nextBookId = 1;
+    Book createBook(String title, String authorName, String author_country, String publisher, int year, String description) {
+    	Author authorob = getOrCreateAuthor(authorName, author_country);
+        Book b = new Book(nextBookId++, title, authorob, publisher, year, description);
+        books.add(b);
+        authorob.books_written.add(b);
+        
+        String sql = "INSERT INTO books(title, author, publisher, year, genre, available) VALUES (?, ?, ?, ?, ?, ?)";
+
+        try (Connection conn = DBConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, title);
+            pstmt.setString(2, authorName);
+            pstmt.setString(3, publisher);
+            pstmt.setInt(4, year);
+            pstmt.setString(5, description);
+            pstmt.setInt(6,  1);
+
+            pstmt.executeUpdate();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return b;
+    }
+    
+    //display books
+    void displayBooks() {
+        for (Book b : books) {
+        	String status = b.available ? "Available" : "Borrowed";
+            System.out.println(b.book_id + "(" + b.genre + "): " + b.title + " by " + b.author.author_name + ", published by " + b.publisher + " in " + b.year + " [" + status + "]");
+        }
+    }
+    
+    //borrow a book
+    boolean borrowBook(int bookId, Member member) {
+        if (member.active_status == true) {
+    	for (Book b : books) {
+            if (b.book_id == bookId && b.available) {
+                b.available = false;
+                b.borrowedBy = member;
+                
+                String sql = "UPDATE books SET available = 0 WHERE id = ?";
+
+                try (Connection conn = DBConnection.connect();
+                     PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+                    pstmt.setInt(1, bookId);
+                    pstmt.executeUpdate();
+
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+
+                return true;
+            }
+        }
+        }
+        return false;
+    }
+    
+    //return a book
+    boolean returnBook(int bookId, Member member) {
+        for (Book b : books) {
+            if (b.book_id == bookId && b.borrowedBy == member) {
+                b.available = true;
+                b.borrowedBy = null;
+                
+                String sql = "UPDATE books SET available = 1 WHERE id = ?";
+
+                try (Connection conn = DBConnection.connect();
+                     PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+                    pstmt.setInt(1, bookId);
+                    pstmt.executeUpdate();
+
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+
+                return true;
+            }
+        }
+        return false;
+    }
+    //display books borrowed by member who is logged in
+    void displayBorrowedBooks(Member member) {
+        System.out.println(member.member_name + "'s borrowed books:");
+        for (Book b : books) {
+            if (b.borrowedBy == member) {
+                System.out.println(b.book_id + ": " + b.title + " by " + b.author.author_name);
+            }
+        }
+    }
+    
+    //display authors
+    void displayAuthors() {
+        for (Author a : authors) {
+        	System.out.println(a.author_id + ": " + a.author_name + " (" + a.country + ")");
+            
+        }
+    }
+    
+    void displayBooksByAuthor(int authorId) {
+        for (Author a : authors) {
+            if (a.author_id == authorId) {
+                System.out.println("Books by " + a.author_name + ":");
+                
+                for (Book b : a.books_written) {
+                    String status = b.available ? "Available" : "Borrowed";
+                    System.out.println(b.book_id + ": " + b.title + " [" + status + "]");
+                }
+                return;
+            }
+        }
+        System.out.println("Author not found.");
+    }
+
+    void loadBooksFromDB() {
+        String sql = "SELECT * FROM books";
+
+        try (Connection conn = DBConnection.connect();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+
+                Author a = getOrCreateAuthor(rs.getString("author"), "Unknown");
+
+                Book b = new Book(
+                    rs.getInt("id"),
+                    rs.getString("title"),
+                    a,
+                    rs.getString("publisher"),
+                    rs.getInt("year"),
+                    rs.getString("genre")
+                );
+
+                b.available = rs.getInt("available") == 1;
+
+                books.add(b);
+                a.books_written.add(b);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+    
+}
+
+class LibraryGUI extends JFrame {
+
+    private Library library;
+    private Member currentMember;
+    private Admin currentAdmin;
+
+    private CardLayout cardLayout;
+    private JPanel mainPanel;
+
+    public LibraryGUI(Library library) {
+        this.library = library;
+
+        setTitle("Library System");
+        setSize(500, 400);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        cardLayout = new CardLayout();
+        mainPanel = new JPanel(cardLayout);
+
+        mainPanel.add(loginPanel(), "login");
+        mainPanel.add(adminPanel(), "admin");
+        mainPanel.add(memberPanel(), "member");
+
+        add(mainPanel);
+        setVisible(true);
+    }
+
+    // ---------------- LOGIN PANEL ----------------
+    private JPanel loginPanel() {
+        JPanel panel = new JPanel(new GridLayout(4, 2));
+
+        JTextField email = new JTextField();
+        JPasswordField password = new JPasswordField();
+
+        JButton loginBtn = new JButton("Login");
+
+        panel.add(new JLabel("Email:"));
+        panel.add(email);
+        panel.add(new JLabel("Password:"));
+        panel.add(password);
+        panel.add(new JLabel());
+        panel.add(loginBtn);
+
+        loginBtn.addActionListener(e -> {
+            String em = email.getText();
+            String pw = new String(password.getPassword());
+
+            currentAdmin = library.authenticateAdmin(em, pw);
+            if (currentAdmin != null) {
+                cardLayout.show(mainPanel, "admin");
+                return;
+            }
+
+            currentMember = library.memberLogin(em, pw);
+            if (currentMember != null) {
+                cardLayout.show(mainPanel, "member");
+                return;
+            }
+
+            JOptionPane.showMessageDialog(this, "Invalid login");
+        });
+
+        return panel;
+    }
+
+    // ---------------- ADMIN PANEL ----------------
+    private JPanel adminPanel() {
+        JPanel panel = new JPanel(new GridLayout(5, 1));
+
+        JButton addBook = new JButton("Add Book");
+        JButton viewBooks = new JButton("View Books");
+        JButton addMember = new JButton("Add Member");
+        JButton viewMembers = new JButton("View Members");
+        JButton logout = new JButton("Logout");
+
+        panel.add(addBook);
+        panel.add(viewBooks);
+        panel.add(addMember);
+        panel.add(viewMembers);
+        panel.add(logout);
+
+        addBook.addActionListener(e -> {
+            String title = JOptionPane.showInputDialog("Title:");
+            String author = JOptionPane.showInputDialog("Author:");
+            String country = JOptionPane.showInputDialog("Author Country:");
+            String publisher = JOptionPane.showInputDialog("Publisher:");
+            int year = Integer.parseInt(JOptionPane.showInputDialog("Year:"));
+            String genre = JOptionPane.showInputDialog("Genre:");
+
+            library.createBook(title, author, country, publisher, year, genre);
+        });
+
+        viewBooks.addActionListener(e -> {
+            StringBuilder sb = new StringBuilder();
+            for (Book b : library.books) {
+                sb.append(b.book_id + ": " + b.title + "\n");
+            }
+            JOptionPane.showMessageDialog(this, sb.toString());
+        });
+
+        addMember.addActionListener(e -> {
+            String name = JOptionPane.showInputDialog("Name:");
+            String card = JOptionPane.showInputDialog("Card #:");
+            String email = JOptionPane.showInputDialog("Email:");
+            String pass = JOptionPane.showInputDialog("Password:");
+
+            library.createMember(name, card, email, pass);
+        });
+
+        viewMembers.addActionListener(e -> {
+            StringBuilder sb = new StringBuilder();
+            for (Member m : library.members) {
+                sb.append(m.member_name + "\n");
+            }
+            JOptionPane.showMessageDialog(this, sb.toString());
+        });
+
+        logout.addActionListener(e -> cardLayout.show(mainPanel, "login"));
+
+        return panel;
+    }
+
+    // ---------------- MEMBER PANEL ----------------
+    private JPanel memberPanel() {
+        JPanel panel = new JPanel(new GridLayout(5, 1));
+
+        JButton viewBooks = new JButton("View Books");
+        JButton borrow = new JButton("Borrow Book");
+        JButton returnBook = new JButton("Return Book");
+        JButton myBooks = new JButton("My Books");
+        JButton logout = new JButton("Logout");
+
+        panel.add(viewBooks);
+        panel.add(borrow);
+        panel.add(returnBook);
+        panel.add(myBooks);
+        panel.add(logout);
+
+        viewBooks.addActionListener(e -> {
+            StringBuilder sb = new StringBuilder();
+            for (Book b : library.books) {
+                sb.append(b.book_id + ": " + b.title + "\n");
+            }
+            JOptionPane.showMessageDialog(this, sb.toString());
+        });
+
+        borrow.addActionListener(e -> {
+            int id = Integer.parseInt(JOptionPane.showInputDialog("Book ID:"));
+            if (library.borrowBook(id, currentMember)) {
+                JOptionPane.showMessageDialog(this, "Borrowed!");
+            } else {
+                JOptionPane.showMessageDialog(this, "Not available.");
+            }
+        });
+
+        returnBook.addActionListener(e -> {
+            int id = Integer.parseInt(JOptionPane.showInputDialog("Book ID:"));
+            if (library.returnBook(id, currentMember)) {
+                JOptionPane.showMessageDialog(this, "Returned!");
+            } else {
+                JOptionPane.showMessageDialog(this, "Error.");
+            }
+        });
+
+        myBooks.addActionListener(e -> {
+            StringBuilder sb = new StringBuilder();
+            for (Book b : library.books) {
+                if (b.borrowedBy == currentMember) {
+                    sb.append(b.title + "\n");
+                }
+            }
+            JOptionPane.showMessageDialog(this, sb.toString());
+        });
+
+        logout.addActionListener(e -> cardLayout.show(mainPanel, "login"));
+
+        return panel;
+    }
+}
+
+//MAIN CLASS
+public class LibManSystem {
+	public static void main(String[] args) {
+		DBSetup.initialize();
+		System.out.println(new java.io.File("library.db").getAbsolutePath());
+		
+		Library library = new Library();
+		
+		library.loadBooksFromDB();
+
+		if (library.books.isEmpty()) {
+			library.createBook("1984", "George Orwell", "UK", "Secker", 1949, "Dystopian");
+		}
+		if (library.members.isEmpty()) {
+			library.createMember("Abby", "12345", "abby@email.com", "pass");
+			library.createAdmin("Admin", "Librarian", "admin123", "admin@library.com");
+		}
+		new LibraryGUI(library);
+	}
+}
