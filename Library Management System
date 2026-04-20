@@ -253,7 +253,7 @@ class LibraryGUI extends JFrame {
     private JPanel mainPanel;
     
     private JTable bookTable;
-    private DefaultTableModel bookTableModel;
+    private DefaultTableModel tableModel;
 
     public LibraryGUI(Library library) {
         this.library = library;
@@ -266,8 +266,8 @@ class LibraryGUI extends JFrame {
         mainPanel = new JPanel(cardLayout);
         
         String[] columns = {"ID", "Title", "Author", "Year", "Status"};
-        bookTableModel = new DefaultTableModel(columns, 0);
-        bookTable = new JTable(bookTableModel);
+        tableModel = new DefaultTableModel(columns, 0);
+        bookTable = new JTable(tableModel);
 
         mainPanel.add(loginPanel(), "login");
         mainPanel.add(adminPanel(), "admin");
@@ -278,13 +278,14 @@ class LibraryGUI extends JFrame {
         setVisible(true);   
     }
     
-    private void refreshTable() {
-        bookTableModel.setRowCount(0);
+    private void showBooksTable() {
+        String[] columns = {"ID", "Title", "Author", "Year", "Status"};
+        tableModel.setDataVector(new Object[0][0], columns);
 
         for (Book b : library.books) {
             String status = b.available ? "Available" : "Borrowed";
 
-            bookTableModel.addRow(new Object[]{
+            tableModel.addRow(new Object[]{
                 b.book_id,
                 b.title,
                 b.author.author_name,
@@ -292,6 +293,48 @@ class LibraryGUI extends JFrame {
                 status
             });
         }
+
+        cardLayout.show(mainPanel, "table");
+    }
+    
+    private void showMembersTable() {
+        String[] columns = {"ID", "Name", "Card #", "Email", "Status"};
+        tableModel.setDataVector(new Object[0][0], columns);
+
+        for (Member m : library.members) {
+            String status = m.active_status ? "Active" : "Inactive";
+
+            tableModel.addRow(new Object[]{
+                m.member_id,
+                m.member_name,
+                m.lib_card_num,
+                m.email,
+                status
+            });
+        }
+
+        cardLayout.show(mainPanel, "table");
+    }
+    
+    private void showMyBooksTable() {
+        String[] columns = {"ID", "Title", "Author", "Year", "Status"};
+        tableModel.setDataVector(new Object[0][0], columns);
+
+        for (Book b : library.books) {
+            if (b.borrowedBy == currentMember) {
+            	tableModel.addRow(new Object[]{
+                        b.book_id,
+                        b.title,
+                        b.author.author_name,
+                        b.year,
+                        "Borrowed"
+                    });
+            }
+
+            
+        }
+
+        cardLayout.show(mainPanel, "table");
     }
 
     
@@ -375,7 +418,6 @@ class LibraryGUI extends JFrame {
             if (m != null) {
                 currentMember = m;
                 currentAdmin = null;
-                refreshTable();
                 cardLayout.show(mainPanel, "member");
                 return;
             }
@@ -413,10 +455,7 @@ class LibraryGUI extends JFrame {
             library.createBook(title, author, country, publisher, year, genre);
         });
 
-        viewBooks.addActionListener(e -> {
-        	refreshTable();
-            cardLayout.show(mainPanel, "table");
-        });
+        viewBooks.addActionListener(e -> showBooksTable());
 
         addMember.addActionListener(e -> {
             String name = JOptionPane.showInputDialog("Name:");
@@ -427,13 +466,7 @@ class LibraryGUI extends JFrame {
             library.createMember(name, card, email, pass);
         });
 
-        viewMembers.addActionListener(e -> {
-            StringBuilder sb = new StringBuilder();
-            for (Member m : library.members) {
-                sb.append(m.member_name + "\n");
-            }
-            JOptionPane.showMessageDialog(this, sb.toString());
-        });
+        viewMembers.addActionListener(e -> showMembersTable());
 
         logout.addActionListener(e -> cardLayout.show(mainPanel, "login"));
 
@@ -447,7 +480,7 @@ class LibraryGUI extends JFrame {
         JButton viewBooks = new JButton("View Books");
         JButton borrow = new JButton("Borrow Book");
         JButton returnBook = new JButton("Return Book");
-        JButton myBooks = new JButton("My Books");
+        JButton myBooks = new JButton("View My Books");
         JButton logout = new JButton("Logout");
 
         panel.add(viewBooks);
@@ -456,10 +489,7 @@ class LibraryGUI extends JFrame {
         panel.add(myBooks);
         panel.add(logout);
 
-        viewBooks.addActionListener(e -> {
-        	refreshTable();
-            cardLayout.show(mainPanel, "table");
-        });
+        viewBooks.addActionListener(e -> showBooksTable());
 
         borrow.addActionListener(e -> {
             int id = Integer.parseInt(JOptionPane.showInputDialog("Book ID:"));
@@ -479,15 +509,7 @@ class LibraryGUI extends JFrame {
             }
         });
 
-        myBooks.addActionListener(e -> {
-            StringBuilder sb = new StringBuilder();
-            for (Book b : library.books) {
-                if (b.borrowedBy == currentMember) {
-                    sb.append(b.title + "\n");
-                }
-            }
-            JOptionPane.showMessageDialog(this, sb.toString());
-        });
+        myBooks.addActionListener(e -> showMyBooksTable());
 
         logout.addActionListener(e -> cardLayout.show(mainPanel, "login"));
 
