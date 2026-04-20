@@ -3,6 +3,7 @@ import java.util.Scanner;
 import java.util.ArrayList;
 import javax.swing.*;
 import java.awt.*;
+import javax.swing.table.*;
 
 //BOOK CLASS
 class Book {
@@ -251,6 +252,7 @@ class LibraryGUI extends JFrame {
     private CardLayout cardLayout;
     private JPanel mainPanel;
     
+    private JTable bookTable;
     private DefaultTableModel bookTableModel;
 
     public LibraryGUI(Library library) {
@@ -262,13 +264,53 @@ class LibraryGUI extends JFrame {
 
         cardLayout = new CardLayout();
         mainPanel = new JPanel(cardLayout);
+        
+        String[] columns = {"ID", "Title", "Author", "Year", "Status"};
+        bookTableModel = new DefaultTableModel(columns, 0);
+        bookTable = new JTable(bookTableModel);
 
         mainPanel.add(loginPanel(), "login");
         mainPanel.add(adminPanel(), "admin");
         mainPanel.add(memberPanel(), "member");
+        mainPanel.add(tablePanel(), "table");
 
         add(mainPanel);
-        setVisible(true);
+        setVisible(true);   
+    }
+    
+    private void refreshTable() {
+        bookTableModel.setRowCount(0);
+
+        for (Book b : library.books) {
+            String status = b.available ? "Available" : "Borrowed";
+
+            bookTableModel.addRow(new Object[]{
+                b.book_id,
+                b.title,
+                b.author.author_name,
+                b.year,
+                status
+            });
+        }
+    }
+
+    
+    private JPanel tablePanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        JScrollPane scrollPane = new JScrollPane(bookTable);
+        panel.add(scrollPane, BorderLayout.CENTER);
+        
+        JButton back = new JButton("Back");
+        back.addActionListener(e -> {
+            if (currentAdmin != null) {
+                cardLayout.show(mainPanel, "admin");
+            } else {
+                cardLayout.show(mainPanel, "member");
+            }
+        });
+
+        panel.add(back, BorderLayout.SOUTH);
+        return panel;
     }
 
     // ---------------- LOGIN PANEL ----------------
@@ -298,14 +340,30 @@ class LibraryGUI extends JFrame {
         panel.add(loginBtn, gbc);
 
         loginBtn.addActionListener(e -> {
-        	Member m = library.memberLogin(email.getText(), new String(password.getPassword()));
+            String enteredEmail = email.getText();
+            String enteredPassword = new String(password.getPassword());
+
+            // Check admin first
+            Admin a = library.authenticateAdmin(enteredEmail, enteredPassword);
+            if (a != null) {
+                currentAdmin = a;
+                currentMember = null; // clear member
+                cardLayout.show(mainPanel, "admin");
+                return;
+            }
+
+            // Then check member
+            Member m = library.memberLogin(enteredEmail, enteredPassword);
             if (m != null) {
                 currentMember = m;
+                currentAdmin = null; // clear admin
                 refreshTable();
-                CardLayout.show(mainPanel, "member");
-            } else {
-                JOptionPane.showMessageDialog(this, "Invalid login");
+                cardLayout.show(mainPanel, "member");
+                return;
             }
+
+            // Neither worked
+            JOptionPane.showMessageDialog(this, "Invalid login");
         });
 
         return panel;
@@ -339,11 +397,8 @@ class LibraryGUI extends JFrame {
         });
 
         viewBooks.addActionListener(e -> {
-            StringBuilder sb = new StringBuilder();
-            for (Book b : library.books) {
-                sb.append(b.book_id + ": " + b.title + "\n");
-            }
-            JOptionPane.showMessageDialog(this, sb.toString());
+        	refreshTable();
+            cardLayout.show(mainPanel, "table");
         });
 
         addMember.addActionListener(e -> {
@@ -385,11 +440,8 @@ class LibraryGUI extends JFrame {
         panel.add(logout);
 
         viewBooks.addActionListener(e -> {
-            StringBuilder sb = new StringBuilder();
-            for (Book b : library.books) {
-                sb.append(b.book_id + ": " + b.title + "\n");
-            }
-            JOptionPane.showMessageDialog(this, sb.toString());
+        	refreshTable();
+            cardLayout.show(mainPanel, "table");
         });
 
         borrow.addActionListener(e -> {
