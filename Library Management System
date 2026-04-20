@@ -315,54 +315,71 @@ class LibraryGUI extends JFrame {
 
     // ---------------- LOGIN PANEL ----------------
     private JPanel loginPanel() {
-        JPanel panel = new JPanel(new GridLayout(4, 2));
+        JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
+        
+        panel.setBorder(BorderFactory.createEmptyBorder(40, 40, 40, 40));
+
         gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        JLabel title = new JLabel("Library Login", JLabel.CENTER);
+        title.setFont(new Font("Arial", Font.BOLD, 18));
+
+        gbc.gridx = 0; gbc.gridy = 0; // or insert before everything
+        gbc.gridwidth = 2;
+        panel.add(title, gbc);
 
         JTextField email = new JTextField(15);
         JPasswordField password = new JPasswordField(15);
-
         JButton loginBtn = new JButton("Login");
         
-        gbc.gridx = 0; gbc.gridy = 1;
+        loginBtn.setPreferredSize(new Dimension(120, 30));
+
+        // Email label
+        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1;
         panel.add(new JLabel("Email:"), gbc);
-        
+
+        // Email field
         gbc.gridx = 1;
         panel.add(email, gbc);
-        
-        gbc.gridx = 0; gbc.gridy = 1;
+
+        // Password label
+        gbc.gridx = 0; gbc.gridy = 2;
         panel.add(new JLabel("Password:"), gbc);
-        
+
+        // Password field
         gbc.gridx = 1;
         panel.add(password, gbc);
-        
-        gbc.gridx = 1; gbc.gridy = 2;
+
+        // Login button (centered)
+        gbc.gridx = 0; gbc.gridy = 3;
+        gbc.gridwidth = 2;
+        gbc.anchor = GridBagConstraints.CENTER;
         panel.add(loginBtn, gbc);
 
+        // Login logic (keep yours here)
         loginBtn.addActionListener(e -> {
             String enteredEmail = email.getText();
             String enteredPassword = new String(password.getPassword());
 
-            // Check admin first
             Admin a = library.authenticateAdmin(enteredEmail, enteredPassword);
             if (a != null) {
                 currentAdmin = a;
-                currentMember = null; // clear member
+                currentMember = null;
                 cardLayout.show(mainPanel, "admin");
                 return;
             }
 
-            // Then check member
             Member m = library.memberLogin(enteredEmail, enteredPassword);
             if (m != null) {
                 currentMember = m;
-                currentAdmin = null; // clear admin
+                currentAdmin = null;
                 refreshTable();
                 cardLayout.show(mainPanel, "member");
                 return;
             }
 
-            // Neither worked
             JOptionPane.showMessageDialog(this, "Invalid login");
         });
 
