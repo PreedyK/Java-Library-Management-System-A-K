@@ -1,0 +1,990 @@
+package comHamann;
+
+import java.util.ArrayList;
+import javax.swing.*;
+import java.awt.*;
+import javax.swing.table.*;
+import java.sql.*;
+
+class DBConnection {
+    private static final String URL = "jdbc:sqlite:library.db";
+
+    public static Connection connect() {
+        try {
+        	Class.forName("org.sqlite.JDBC");
+            return DriverManager.getConnection(URL);
+        } catch (Exception e) {
+            System.out.println("Connection failed: " + e.getMessage());
+            return null;
+        }
+    }
+}
+class DBSetup { 
+	public static void initialize() { 
+		
+		String books = """
+	            CREATE TABLE IF NOT EXISTS books (
+	                id INTEGER PRIMARY KEY AUTOINCREMENT,
+	                title TEXT,
+	                author TEXT,
+	                publisher TEXT,
+	                year INTEGER,
+	                genre TEXT,
+	                available INTEGER,
+	                borrowed_by INTEGER
+	            );
+	        """;
+
+	        String members = """
+	            CREATE TABLE IF NOT EXISTS members (
+	                id INTEGER PRIMARY KEY AUTOINCREMENT,
+	                name TEXT,
+	                card TEXT,
+	                email TEXT,
+	                password TEXT,
+	                active INTEGER
+	            );
+	        """;
+
+	        try (Connection conn = DBConnection.connect();
+	        	     Statement stmt = conn.createStatement()) {
+
+	        	    stmt.execute(books);
+	        	    stmt.execute(members);
+
+	        	    // check if column exists before adding it
+	        	    ResultSet rs = stmt.executeQuery("PRAGMA table_info(books)");
+
+	        	    boolean hasBorrowedBy = false;
+
+	        	    while (rs.next()) {
+	        	        if (rs.getString("name").equals("borrowed_by")) {
+	        	            hasBorrowedBy = true;
+	        	            break;
+	        	        }
+	        	    }
+
+	        	    if (!hasBorrowedBy) {
+	        	        stmt.execute("ALTER TABLE books ADD COLUMN borrowed_by INTEGER");
+	        	    }
+	        	    
+	        	    // check if 'activated' column exists
+	        	    ResultSet rs2 = stmt.executeQuery("PRAGMA table_info(books)");
+
+	        	    boolean hasActivated = false;
+
+	        	    while (rs2.next()) {
+	        	        if (rs2.getString("name").equals("activated")) {
+	        	            hasActivated = true;
+	        	            break;
+	        	        }
+	        	    }
+
+	        	    if (!hasActivated) {
+	        	        stmt.execute("ALTER TABLE books ADD COLUMN activated INTEGER DEFAULT 1");
+	        	    }
+
+	        	} catch (SQLException e) {
+	        	    e.printStackTrace();
+	        	}
+		
+	}
+}
+
+//BOOK CLASS
+class Book {
+	int book_id;
+	String title;
+	Author author;
+	String publisher;
+	int year;
+	boolean available = true;
+	boolean activated = true;
+	String genre;
+	Member borrowedBy = null;
+	
+	Book(int book_id, String title, Author author, String publisher, int year, String genre) {
+		this.book_id = book_id;
+		this.title = title;
+		this.author = author;
+		this.publisher = publisher;
+		this.year = year;
+		this.genre = genre;
+	}
+		
+}
+
+//MEMBER CLASS
+class Member {
+	int member_id;
+	String member_name;
+	String lib_card_num;
+	String email;
+	String password;
+	boolean active_status = true;
+	
+	Member(int member_id, String member_name, String lib_card_num, String email, String password) {
+		this.member_id = member_id;
+		this.member_name = member_name;
+		this.lib_card_num = lib_card_num;
+		this.email = email;
+		this.password = password;
+	}
+}
+
+//AUTHOR CLASS
+class Author {
+	int author_id;
+	String author_name;
+	String country;
+	ArrayList<Book> books_written = new ArrayList<>();
+	
+	Author(int author_id, String author_name, String country) {
+		this.author_id = author_id;
+		this.author_name = author_name;
+		this.country = country;
+	}
+}
+
+//AUTHOR CLASS
+class Admin {
+	int admin_id;
+	String admin_name;
+	String position;
+	String password;
+	String email;
+	
+	Admin(int admin_id, String admin_name, String position, String password, String email){
+		this.admin_id = admin_id;
+		this.admin_name = admin_name;
+		this.position = position;
+		this.password = password;
+		this.email = email;
+	}
+}
+
+//LIBRARY CLASS
+class Library {
+	ArrayList<Book> books = new ArrayList<>();
+	ArrayList<Member> members = new ArrayList<>();
+	ArrayList<Admin> admins = new ArrayList<>();
+	ArrayList<Author> authors = new ArrayList<>();
+	
+	//create admin
+	int nextAdminid = 1;
+	Admin createAdmin(String name, String position, String password, String email) {
+		Admin a = new Admin(nextAdminid++, name, position, password, email);
+		admins.add(a);
+		return a;
+	}
+	
+	//admin login
+	Admin authenticateAdmin(String current_email, String current_password) {
+		for (Admin a:admins) {
+			if (a.email.equals(current_email)) {
+				if (a.password.equals(current_password)) {
+					return a;
+				}
+			}
+		}
+		return null;
+	}
+	
+	//member login
+	Member memberLogin(String email, String password) {
+		for (Member m: members) {
+			if (m.email.equals(email) && m.password.equals(password)&& m.active_status) {
+				return m;
+			}
+		}
+		return null;
+	}
+	
+	//create member
+    int nextMemberId = 1;
+    Member createMember(String name, String cardNum, String email, String password) {
+
+        String sql = "INSERT INTO members(name, card, email, password, active) VALUES (?, ?, ?, ?, ?)";
+
+        try (Connection conn = DBConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+            pstmt.setString(1, name);
+            pstmt.setString(2, cardNum);
+            pstmt.setString(3, email);
+            pstmt.setString(4, password);
+            pstmt.setInt(5, 1); // active
+
+            pstmt.executeUpdate();
+
+            ResultSet rs = pstmt.getGeneratedKeys();
+            int newId = nextMemberId++;
+
+            if (rs.next()) {
+                newId = rs.getInt(1);
+            }
+
+            Member m = new Member(newId, name, cardNum, email, password);
+            members.add(m);
+
+            return m;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+    
+    //deactivate member
+    Member deactivateMember(int memberId) {
+        String sql = "UPDATE members SET active = 0 WHERE id = ?";
+
+        try (Connection conn = DBConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, memberId);
+            pstmt.executeUpdate();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        for (Member m : members) {
+            if (m.member_id == memberId && m.active_status) {
+                m.active_status = false;
+                return m;
+            }
+        }
+        return null;
+    }
+    
+    Member activateMember(int memberId) {
+        String sql = "UPDATE members SET active = 1 WHERE id = ?";
+
+        try (Connection conn = DBConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, memberId);
+            pstmt.executeUpdate();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        for (Member m : members) {
+            if (m.member_id == memberId && !m.active_status) {
+                m.active_status = true;
+                return m;
+            }
+        }
+        return null;
+    }
+    
+	 
+	//create author
+	int nextAuthorId = 1;
+    Author getOrCreateAuthor(String name, String country) {
+        // Look for existing author
+        for (Author a : authors) {
+            if (a.author_name.equalsIgnoreCase(name)) {
+                return a;
+            }
+        }
+        // Not found → create new
+        Author newAuthor = new Author(nextAuthorId++, name, country);
+        authors.add(newAuthor);
+        return newAuthor;
+    }
+    
+    //create book
+	int nextBookId = 1;
+    Book createBook(String title, String authorName, String author_country, String publisher, int year, String genre) {
+    	Author authorob = getOrCreateAuthor(authorName, author_country);
+    	String sql = "INSERT INTO books(title, author, publisher, year, genre, available) VALUES (?, ?, ?, ?, ?, ?)";
+
+        try (Connection conn = DBConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+            pstmt.setString(1, title);
+            pstmt.setString(2, authorName);
+            pstmt.setString(3, publisher);
+            pstmt.setInt(4, year);
+            pstmt.setString(5, genre);
+            pstmt.setInt(6, 1); // available
+
+            pstmt.executeUpdate();
+
+            ResultSet rs = pstmt.getGeneratedKeys();
+            int newId = nextBookId++;
+
+            if (rs.next()) {
+                newId = rs.getInt(1);
+            }
+
+            Book b = new Book(newId, title, authorob, publisher, year, genre);
+            books.add(b);
+            authorob.books_written.add(b);
+
+            return b;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+    
+    
+    //borrow a book
+    boolean borrowBook(int bookId, Member member) {
+        if (!member.active_status) return false;
+
+        for (Book b : books) {
+            if (b.book_id == bookId && b.available && b.activated) {
+
+                String sql = "UPDATE books SET available = 0, borrowed_by = ? WHERE id = ?";
+
+                try (Connection conn = DBConnection.connect();
+                     PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+                    pstmt.setInt(1, member.member_id);
+                    pstmt.setInt(2, bookId);
+                    pstmt.executeUpdate();
+
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                    return false;
+                }
+
+                b.available = false;
+                b.borrowedBy = member;
+
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    //return a book
+    boolean returnBook(int bookId, Member member) {
+
+        for (Book b : books) {
+            if (b.book_id == bookId && b.borrowedBy == member) {
+
+                String sql = "UPDATE books SET available = 1, borrowed_by = NULL WHERE id = ?";
+
+                try (Connection conn = DBConnection.connect();
+                     PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+                    pstmt.setInt(1, bookId);
+                    pstmt.executeUpdate();
+
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                    return false;
+                }
+
+                b.available = true;
+                b.borrowedBy = null;
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+    
+    
+    void displayBooksByAuthor(int authorId) {
+        for (Author a : authors) {
+            if (a.author_id == authorId) {
+                System.out.println("Books by " + a.author_name + ":");
+                
+                for (Book b : a.books_written) {
+                    String status = b.available ? "Available" : "Borrowed";
+                    System.out.println(b.book_id + ": " + b.title + " [" + status + "]");
+                }
+                return;
+            }
+        }
+        System.out.println("Author not found.");
+    }
+    
+    Book deactivateBook(int bookId) {
+        String sql = "UPDATE books SET activated = 0 WHERE id = ?";
+
+        try (Connection conn = DBConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, bookId);
+            pstmt.executeUpdate();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        for (Book b : books) {
+            if (b.book_id == bookId) {
+                b.activated = false;
+                return b;
+            }
+        }
+        return null;
+    }
+    
+    Book activateBook(int bookId) {
+        String sql = "UPDATE books SET activated = 1 WHERE id = ?";
+
+        try (Connection conn = DBConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, bookId);
+            pstmt.executeUpdate();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        for (Book b : books) {
+            if (b.book_id == bookId) {                
+            	b.activated = true;
+                return b;                
+            }
+        }
+        return null;
+    }
+    
+    void loadBooksFromDB() {
+        String sql = "SELECT * FROM books";
+
+        try (Connection conn = DBConnection.connect();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+
+                Author a = getOrCreateAuthor(rs.getString("author"), "Unknown");
+
+                Book b = new Book(
+                    rs.getInt("id"),
+                    rs.getString("title"),
+                    a,
+                    rs.getString("publisher"),
+                    rs.getInt("year"),
+                    rs.getString("genre")
+                );
+
+                b.available = rs.getInt("available") == 1;
+                b.activated = rs.getInt("activated") == 1;
+                
+                int borrowerId = rs.getInt("borrowed_by");
+
+                if (!rs.wasNull()) {
+                    for (Member m : members) {
+                        if (m.member_id == borrowerId) {
+                            b.borrowedBy = m;
+                            break;
+                        }
+                    }
+                }
+
+                books.add(b);
+                a.books_written.add(b);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    void loadMembersFromDB() {
+        String sql = "SELECT * FROM members";
+
+        try (Connection conn = DBConnection.connect();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+                Member m = new Member(
+                    rs.getInt("id"),
+                    rs.getString("name"),
+                    rs.getString("card"),
+                    rs.getString("email"),
+                    rs.getString("password")
+                );
+
+                m.active_status = rs.getInt("active") == 1;
+
+                members.add(m);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+    
+}
+
+    
+
+
+class LibraryGUI extends JFrame {
+
+    private Library library;
+    private Member currentMember;
+    private Admin currentAdmin;
+
+    private CardLayout cardLayout;
+    private JPanel mainPanel;
+    
+    private JTable bookTable;
+    private JTable memberTable;
+    private JTable myBooksTable;
+
+    private DefaultTableModel bookTableModel;
+    private DefaultTableModel memberTableModel;
+    private DefaultTableModel myBooksTableModel;
+    
+    private int selectedMemberId = -1;
+    private int selectedBookId = -1;
+    
+    private JButton toggleBookBtn;
+    
+    
+    //constructor
+    public LibraryGUI(Library library) {
+        this.library = library;
+
+        setTitle("Library System");
+        setSize(700, 500);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        cardLayout = new CardLayout();
+        mainPanel = new JPanel(cardLayout);
+        
+        // BOOK TABLE
+        String[] bookColumns = {"ID", "Title", "Author", "Year", "Status"};
+        bookTableModel = new DefaultTableModel(bookColumns, 0);
+        bookTable = new JTable(bookTableModel);
+
+        // MEMBER TABLE
+        String[] memberColumns = {"ID", "Name", "Card #", "Email", "Status"};
+        memberTableModel = new DefaultTableModel(memberColumns, 0);
+        memberTable = new JTable(memberTableModel);
+        memberTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        memberTable.setRowSelectionAllowed(true);
+        memberTable.setColumnSelectionAllowed(false);
+        
+     // MYBOOKS TABLE
+        String[] myBooksColumns = {"ID", "Title", "Author", "Year", "Status"};
+        myBooksTableModel = new DefaultTableModel(myBooksColumns, 0);
+        myBooksTable = new JTable(myBooksTableModel);
+
+        mainPanel.add(loginPanel(), "login");
+        mainPanel.add(adminPanel(), "admin");
+        mainPanel.add(memberPanel(), "member");
+        mainPanel.add(bookTablePanel(), "booksTable");
+        mainPanel.add(memberTablePanel(), "membersTable");
+        mainPanel.add(myBooksTablePanel(), "myBooksTable");
+
+        add(mainPanel);
+        setVisible(true);   
+    }
+    
+    private void showBooksTable() {
+        bookTableModel.setRowCount(0);
+
+        for (Book b : library.books) {
+            String status;
+
+            if (!b.activated) {
+                status = "Inactive";
+            } else if (b.available) {
+                status = "Available";
+            } else {
+            	if (b.borrowedBy != null) {
+                    status = "Borrowed by " + b.borrowedBy.member_name;
+                } else {
+                    status = "Borrowed"; // fallback (just in case)
+                }
+            }
+
+            bookTableModel.addRow(new Object[]{
+                b.book_id,
+                b.title,
+                b.author.author_name,
+                b.year,
+                status
+            });
+        }
+        toggleBookBtn.setVisible(currentAdmin != null);
+        toggleBookBtn.setEnabled(currentAdmin != null);
+        
+        cardLayout.show(mainPanel, "booksTable");
+    }
+    
+    private void showMembersTable() {
+        memberTableModel.setRowCount(0);
+
+        for (Member m : library.members) {
+            String status = m.active_status ? "Active" : "Inactive";
+
+            memberTableModel.addRow(new Object[]{
+                m.member_id,
+                m.member_name,
+                m.lib_card_num,
+                m.email,
+                status
+            });
+        }
+
+        cardLayout.show(mainPanel, "membersTable");
+    }
+    
+    private void showMyBooksTable() {
+    	myBooksTableModel.setRowCount(0);
+        for (Book b : library.books) {
+        	if (b.borrowedBy != null && b.borrowedBy == currentMember) {
+                myBooksTableModel.addRow(new Object[]{
+                    b.book_id,
+                    b.title,
+                    b.author.author_name,
+                    b.year,
+                    "Borrowed"
+                });
+            }           
+        }
+        cardLayout.show(mainPanel, "myBooksTable");
+    }
+    private void enableMemberSelection(JButton actionButton) {
+
+        memberTable.getSelectionModel().addListSelectionListener(e -> {
+            if (e.getValueIsAdjusting()) return;
+
+            int row = memberTable.getSelectedRow();
+            if (row == -1) return;
+
+            selectedMemberId = (int) memberTableModel.getValueAt(row, 0);
+            
+
+        });
+    }
+    
+    private void enableBookSelection(JButton actionButton) {
+
+        bookTable.getSelectionModel().addListSelectionListener(e -> {
+            if (e.getValueIsAdjusting()) return;
+
+            int row = bookTable.getSelectedRow();
+            if (row == -1) return;
+
+            selectedBookId = (int) bookTableModel.getValueAt(row, 0);
+            
+         
+        });
+    }
+    
+    private JPanel bookTablePanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+
+        JScrollPane scrollPane = new JScrollPane(bookTable);
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        JPanel bottom = new JPanel();
+
+        // ✅ create ONCE and store in instance variable
+        toggleBookBtn = new JButton("Toggle Book Status");
+        JButton back = new JButton("Back");
+
+        enableBookSelection(toggleBookBtn);
+
+        toggleBookBtn.addActionListener(e -> {
+            if (selectedBookId == -1) {
+                JOptionPane.showMessageDialog(this, "Select a book first.");
+                return;
+            }
+
+            Book target = null;
+            for (Book b : library.books) {
+                if (b.book_id == selectedBookId) {
+                    target = b;
+                    break;
+                }
+            }
+
+            if (target == null) return;
+
+            if (target.activated) {
+                library.deactivateBook(selectedBookId);
+                JOptionPane.showMessageDialog(this, "Book deactivated.");
+            } else {
+                library.activateBook(selectedBookId);
+                JOptionPane.showMessageDialog(this, "Book activated.");
+            }
+
+            showBooksTable();
+        });
+
+        back.addActionListener(e -> {
+            if (currentAdmin != null) cardLayout.show(mainPanel, "admin");
+            else cardLayout.show(mainPanel, "member");
+        });
+
+        bottom.add(toggleBookBtn); // always added
+        bottom.add(back);
+
+        panel.add(bottom, BorderLayout.SOUTH);
+        return panel;
+    }
+    
+    private JPanel memberTablePanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+
+        JScrollPane scrollPane = new JScrollPane(memberTable);
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        JPanel bottom = new JPanel();
+
+        JButton actionBtn = new JButton("Toggle Member Status");
+        JButton back = new JButton("Back");
+
+        enableMemberSelection(actionBtn);
+
+        actionBtn.addActionListener(e -> {
+            if (selectedMemberId == -1) {
+                JOptionPane.showMessageDialog(this, "Select a member first.");
+                return;
+            }
+
+            // find member so we know current state
+            Member target = null;
+            for (Member m : library.members) {
+                if (m.member_id == selectedMemberId) {
+                    target = m;
+                    break;
+                }
+            }
+
+            if (target == null) return;
+
+            if (target.active_status) {
+                library.deactivateMember(selectedMemberId);
+                JOptionPane.showMessageDialog(this, "Member deactivated.");
+            } else {
+                library.activateMember(selectedMemberId);
+                JOptionPane.showMessageDialog(this, "Member activated.");
+            }
+
+            showMembersTable();
+        });
+
+        back.addActionListener(e -> cardLayout.show(mainPanel, "admin"));
+
+        bottom.add(actionBtn);
+        bottom.add(back);
+
+        panel.add(bottom, BorderLayout.SOUTH);
+        return panel;
+    }
+    
+    private JPanel myBooksTablePanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        JScrollPane scrollPane = new JScrollPane(myBooksTable);
+        panel.add(scrollPane, BorderLayout.CENTER);
+        JButton back = new JButton("Back");
+        back.addActionListener(e -> cardLayout.show(mainPanel, "member"));
+        panel.add(back, BorderLayout.SOUTH);
+        return panel;
+    }
+
+    // ---------------- LOGIN PANEL ----------------
+    private JPanel loginPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        
+        panel.setBorder(BorderFactory.createEmptyBorder(40, 40, 40, 40));
+
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        JLabel title = new JLabel("Library Login", JLabel.CENTER);
+        title.setFont(new Font("Arial", Font.BOLD, 18));
+
+        gbc.gridx = 0; gbc.gridy = 0; // or insert before everything
+        gbc.gridwidth = 2;
+        panel.add(title, gbc);
+
+        JTextField email = new JTextField(15);
+        JPasswordField password = new JPasswordField(15);
+        JButton loginBtn = new JButton("Login");
+        
+        loginBtn.setPreferredSize(new Dimension(120, 30));
+
+        // Email label
+        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1;
+        panel.add(new JLabel("Email:"), gbc);
+
+        // Email field
+        gbc.gridx = 1;
+        panel.add(email, gbc);
+
+        // Password label
+        gbc.gridx = 0; gbc.gridy = 2;
+        panel.add(new JLabel("Password:"), gbc);
+
+        // Password field
+        gbc.gridx = 1;
+        panel.add(password, gbc);
+
+        // Login button (centered)
+        gbc.gridx = 0; gbc.gridy = 3;
+        gbc.gridwidth = 2;
+        gbc.anchor = GridBagConstraints.CENTER;
+        panel.add(loginBtn, gbc);
+
+        // Login logic (keep yours here)
+        loginBtn.addActionListener(e -> {
+            String enteredEmail = email.getText();
+            String enteredPassword = new String(password.getPassword());
+
+            Admin a = library.authenticateAdmin(enteredEmail, enteredPassword);
+            if (a != null) {
+                currentAdmin = a;
+                currentMember = null;
+                cardLayout.show(mainPanel, "admin");
+                return;
+            }
+
+            Member m = library.memberLogin(enteredEmail, enteredPassword);
+            if (m != null) {
+                currentMember = m;
+                currentAdmin = null;
+                cardLayout.show(mainPanel, "member");
+                return;
+            }
+
+            JOptionPane.showMessageDialog(this, "Invalid login");
+        });
+
+        return panel;
+    }
+
+    // ---------------- ADMIN PANEL ----------------
+    private JPanel adminPanel() {
+        JPanel panel = new JPanel(new GridLayout(7, 1));
+
+        JButton addBook = new JButton("Add Book");
+        JButton addMember = new JButton("Add Member");
+        JButton manageBooks = new JButton("Manage Books");
+        JButton manageMembers = new JButton("Manage Members");
+        JButton logout = new JButton("Logout");
+
+        panel.add(addBook);
+        panel.add(manageBooks);
+        panel.add(addMember);
+        panel.add(manageMembers);
+        panel.add(logout);
+
+        addBook.addActionListener(e -> {
+            String title = JOptionPane.showInputDialog("Title:");
+            String author = JOptionPane.showInputDialog("Author:");
+            String country = JOptionPane.showInputDialog("Author Country:");
+            String publisher = JOptionPane.showInputDialog("Publisher:");
+            String input = JOptionPane.showInputDialog("Year:");
+            int year;
+            try {
+                year = Integer.parseInt(input);
+            } catch (NumberFormatException event) {
+                JOptionPane.showMessageDialog(this, "Invalid year.");
+                return;
+            }
+            String genre = JOptionPane.showInputDialog("Genre:");
+
+            library.createBook(title, author, country, publisher, year, genre);
+        });
+
+        manageBooks.addActionListener(e -> showBooksTable());
+
+        addMember.addActionListener(e -> {
+            String name = JOptionPane.showInputDialog("Name:");
+            String card = JOptionPane.showInputDialog("Card #:");
+            String email = JOptionPane.showInputDialog("Email:");
+            String pass = JOptionPane.showInputDialog("Password:");
+
+            library.createMember(name, card, email, pass);
+        });
+
+        manageMembers.addActionListener(e -> showMembersTable());
+        
+
+        logout.addActionListener(e -> cardLayout.show(mainPanel, "login"));
+
+        return panel;
+    }
+
+    // ---------------- MEMBER PANEL ----------------
+    private JPanel memberPanel() {
+        JPanel panel = new JPanel(new GridLayout(5, 1));
+
+        JButton viewBooks = new JButton("View Books");
+        JButton borrow = new JButton("Borrow Book");
+        JButton returnBook = new JButton("Return Book");
+        JButton myBooks = new JButton("View My Books");
+        JButton logout = new JButton("Logout");
+
+        panel.add(viewBooks);
+        panel.add(borrow);
+        panel.add(returnBook);
+        panel.add(myBooks);
+        panel.add(logout);
+
+        viewBooks.addActionListener(e -> showBooksTable());
+
+        borrow.addActionListener(e -> {
+            int id = Integer.parseInt(JOptionPane.showInputDialog("Book ID:"));
+            if (library.borrowBook(id, currentMember)) {
+                JOptionPane.showMessageDialog(this, "Borrowed!");
+            } else {
+                JOptionPane.showMessageDialog(this, "Not available.");
+            }
+        });
+
+        returnBook.addActionListener(e -> {
+            int id = Integer.parseInt(JOptionPane.showInputDialog("Book ID:"));
+            if (library.returnBook(id, currentMember)) {
+                JOptionPane.showMessageDialog(this, "Returned!");
+            } else {
+                JOptionPane.showMessageDialog(this, "Error.");
+            }
+        });
+
+        myBooks.addActionListener(e -> showMyBooksTable());
+
+        logout.addActionListener(e -> cardLayout.show(mainPanel, "login"));
+
+        return panel;
+    }
+}
+
+//MAIN CLASS
+public class LibManSystem {
+	public static void main(String[] args) {
+		DBSetup.initialize();
+		Library library = new Library();
+		library.loadMembersFromDB();
+		library.loadBooksFromDB();
+		
+		
+		library.createAdmin("Admin", "Librarian", "admin123", "admin@library.com");
+		if (library.books.isEmpty()) {
+			library.createBook("1984", "George Orwell", "UK", "Secker", 1949, "Dystopian");
+		}
+		if (library.members.isEmpty()) {
+			library.createMember("Abby", "12345", "abby@email.com", "pass");
+			
+		}
+
+		new LibraryGUI(library);
+	}
+}
